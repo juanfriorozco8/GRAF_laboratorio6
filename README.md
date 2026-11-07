@@ -10,31 +10,45 @@ Juan Francisco Orozco Mijangos (24647)
 
 ## Descripción del proyecto
 
-En este laboratorio recreamos los dos soles de Tatooine, Scarif, Bespin y Naboo para practicar cómo se puede cambiar por completo la apariencia de un objeto con un shader. Cargamos una sola vez la esfera que nos dieron y reutilizamos sus 98 vértices y 192 triángulos para los cinco cuerpos. En la vista de Tatooine dibujamos la malla dos veces con posiciones, escalas y materiales distintos. Los otros planetas se ven uno a la vez para apreciar sus detalles.
+En este laboratorio recreamos los dos soles de Tatooine, Scarif, Bespin, Naboo y Mustafar para practicar cómo se puede cambiar por completo la apariencia de un objeto con un shader. Cargamos una sola vez la esfera que nos dieron y reutilizamos sus 98 vértices y 192 triángulos para los seis cuerpos. En la vista de Tatooine dibujamos la malla dos veces con posiciones, escalas y materiales distintos. Los planetas se ven uno a la vez en un visor con fondo negro y un rótulo que indica su clasificación. Tomamos las imágenes de referencia como guía para las paletas, la iluminación y los patrones de cada material.
 
 Reconstruimos el pipeline en Rust siguiendo el material de clase sobre el rasterizador y el dibujo de múltiples modelos. Primero pasamos cada vértice por las transformaciones de modelo y vista y lo proyectamos a pantalla. Después usamos coordenadas baricéntricas y un búfer de profundidad para decidir qué fragmentos son visibles. En cada fragmento interpolamos la posición local con corrección de perspectiva y obtenemos una normal radial. Con ella, la luz y el tiempo calculamos el color usando ruido tridimensional, máscaras y funciones matemáticas. Toda esa parte corre en CPU. Raylib abre la ventana y muestra los píxeles que ya calculamos. [Esfera](assets/sphere.obj) · [Pipeline](src/pipeline.rs) · [Shaders](src/shaders.rs)
 
 ## Compilación y ejecución
 
-Se necesita Rust estable con Cargo, CMake y un compilador C/C++ con Clang. En macOS, las herramientas de línea de comandos de Xcode proporcionan Clang. Si hacen falta, se pueden instalar con `xcode-select --install` y, con Homebrew, instalar CMake con `brew install cmake`.
+Se necesita Rust estable con Cargo, CMake y un compilador C/C++ con Clang. En macOS, si hacen falta las herramientas de línea de comandos de Xcode, ejecuta `xcode-select --install` y espera a que termine. Con Homebrew se puede instalar CMake con `brew install cmake`. Comprueba que `cargo --version`, `cmake --version` y `clang --version` respondan antes de compilar.
 
-Desde la raíz del repositorio:
+Abre Terminal en la carpeta del repositorio, donde están `Cargo.toml` y este README, y ejecuta:
 
 ```sh
 cargo build --release --locked
 cargo run --release --locked
 ```
 
+Al abrirse el visor verás los dos soles. Haz clic dentro de la ventana si el teclado sigue escribiendo en Terminal. Pulsa `H` para abrir o cerrar la ayuda en pantalla.
+
 | Tecla | Acción |
 | --- | --- |
-| `1` | Mostrar juntos los dos soles de Tatooine |
-| `2`, `3`, `4` | Mostrar Scarif, Bespin o Naboo, respectivamente |
-| `←` / `→` | Girar la dirección de la luz |
-| `↑` / `↓` | Aumentar o reducir la cobertura de nubes de Scarif |
-| Espacio | Pausar o reanudar la animación del material y las nubes. La luz se puede mover en pausa. |
-| `S` | Alternar las sombras de nubes de Scarif para compararlas con la superficie iluminada |
-| `R` | Restaurar el tiempo, la luz, la cobertura y las sombras a sus valores iniciales |
-| Esc | Cerrar la ventana |
+| `1` | Tatooine, dos estrellas con plasma animado |
+| `2` | Scarif, planeta rocoso con nubes bajas, sombras y luces nocturnas |
+| `3` | Bespin, gigante gaseoso con corrientes de viento y una tormenta |
+| `4` | Naboo, planeta rocoso con frentes de nubes altas |
+| `5` | Mustafar, planeta rocoso con ríos de lava y ceniza |
+| Mantener `←` / `→` | Girar la iluminación del planeta. Los soles tienen brillo propio. |
+| Mantener `↑` / `↓` | Subir o bajar el efecto de la vista activa. El visor indica cuál se ajusta y muestra su porcentaje. |
+| Espacio | Pausar o reanudar el tiempo del material. La luz y el ajuste del efecto siguen disponibles. |
+| `S` | En Scarif, alternar las sombras manteniendo las nubes visibles |
+| `R` | Restaurar el reloj, la luz y el efecto de la vista activa. En Scarif también restablece sus sombras. |
+| `H` | Mostrar u ocultar los controles detallados |
+| Esc | Cerrar el visor |
+
+### Cómo comprobar los efectos
+
+1. **Scarif.** Pulsa `2` y `R`. Mantén `↑` para aumentar la cobertura. Pulsa Espacio para congelar el patrón y cambia la luz con `←` o `→`. En el lado iluminado busca el reflejo sobre el agua. En el lado nocturno busca los puntos ámbar de la costa. Pulsa `S` para comparar las sombras con la misma luz y las mismas nubes.
+2. **Bespin y Naboo.** Pulsa `3` y observa cómo se desplazan las vetas cobrizas a través de las bandas curvadas. Usa `↑` para destacar la turbulencia. Pulsa `4` y cambia la cobertura para separar visualmente las nubes altas del terreno fijo.
+3. **Tatooine y Mustafar.** Pulsa `1` o `5` y observa los filamentos del plasma o el brillo que recorre las grietas. Pulsa Espacio para congelarlos y usa `↑` y `↓` para apreciar el cambio de intensidad a tiempo fijo.
+
+La interfaz usa Lato Medium para los títulos y la ayuda. [Licencia de la tipografía](assets/fonts/OFL-Lato.txt)
 
 ## Cuerpos celestes
 
@@ -42,45 +56,37 @@ cargo run --release --locked
 
 **Izquierda, sol ámbar.** Combinamos gránulos finos con ruido de menor frecuencia para distribuir manchas oscuras. Otro campo de ruido deforma el plasma y el tiempo hace que cambie la red de filamentos dorados. `PLASMA_SPEED` cambia la velocidad de esa deformación. El umbral de `spots` controla cuántas manchas aparecen.
 
-**Derecha, sol rojo.** Estiramos el patrón de ruido en latitud para crear vetas más largas y usamos arcos rojizos de gran escala para separar regiones calientes. El vector de frecuencia en `storm` controla cuánto se estiran las vetas. Ambos soles emiten su propio color y se animan con la geometría inmóvil. [Animación de los soles](docs/soles.mp4)
+**Derecha, sol rojo.** Estiramos el patrón de ruido en latitud para crear vetas más largas y usamos arcos rojizos de gran escala para separar regiones calientes. El vector de frecuencia en `storm` controla cuánto se estiran las vetas.
+
+En `tatoo_i` y `tatoo_ii`, el tiempo modifica las coordenadas del ruido de cada material. Ambos soles emiten su propio color y sus filamentos se mueven con la geometría inmóvil. [Código](src/shaders.rs) · [Animación de los soles](docs/soles.mp4)
 
 ![Los soles de Tatooine, ámbar a la izquierda y rojo a la derecha](docs/soles.png)
 
 ### Scarif
 
-Usamos un campo de altura para separar la selva, la arena, las aguas someras y el océano profundo. El umbral de `land` mueve la línea de costa y el de `shallow` cambia el ancho del agua turquesa. La máscara de tierra reserva el reflejo especular para el agua. Agregamos luces costeras en la noche y combinamos el terreno con una máscara de nubes que se desplaza por separado. [Movimiento de las nubes](docs/scarif-nubes.mp4) · [Barrido de luz](docs/scarif-luz.mp4)
+En `scarif` usamos un campo de altura para separar los arrecifes turquesa, el océano azul profundo y las islas con costas irregulares. El umbral de `land` mueve la costa y el de `shallow` cambia el ancho de los arrecifes. [Código](src/shaders.rs)
 
-![Scarif con archipiélagos verdes, aguas turquesa y nubes dispersas](docs/scarif.png)
+- **Día y noche.** En `coastal_lights` combinamos una máscara de costa con la dirección de la luz para encender los asentamientos del lado nocturno. `NIGHT_LIGHT_STRENGTH` cambia su brillo. [Barrido de luz](docs/scarif-luz.mp4)
+- **Agua y tierra.** En `water_reflection` calculamos el brillo especular y en `scarif` lo limitamos al agua. La tierra conserva su respuesta difusa. Subir `WATER_SPECULAR_POWER` hace el reflejo más estrecho. [Barrido de luz](docs/scarif-luz.mp4)
+- **Nubes.** En `cloud_mask` desplazamos las coordenadas del ruido sin mover las islas. `CLOUD_SPEED` cambia la velocidad y las flechas verticales ajustan la cobertura. [Movimiento con luz fija](docs/scarif-nubes.mp4)
+- **Sombras de nubes.** En `cloud_shadow` seguimos la dirección de la luz hasta una altura virtual y evaluamos allí la misma máscara de nubes para atenuar la luz directa. `CLOUD_HEIGHT` cambia la separación entre la nube y su sombra cuando la luz llega de lado. El video muestra las sombras a la izquierda y la misma escena con las sombras desactivadas a la derecha. [Comparación con nubes fijas](docs/scarif-sombras.mp4)
+
+![Scarif con archipiélagos, arrecifes turquesa y una atmósfera azul](docs/scarif.png)
 
 ### Bespin
 
-Mezclamos ondas de distintas frecuencias con ruido para producir bandas crema, rosa y malva. Cerca de la tormenta rotamos las coordenadas antes de evaluar las bandas. La rotación disminuye con la distancia, así las franjas se curvan alrededor del vórtice y vuelven a su dirección original al alejarse. `VORTEX_RADIUS` cambia el tamaño de la zona afectada.
+En `bespin` mezclamos ondas inclinadas y ruido para generar bandas de cobre, ámbar y arena. Cerca de la tormenta, `bespin_vortex` rota las coordenadas antes de evaluar las bandas. El giro disminuye con la distancia al centro y la tormenta curva las franjas. Las vetas de gas viajan sobre las bandas con el tiempo. `VORTEX_RADIUS` cambia el tamaño de la zona afectada y `BESPIN_WIND_SPEED` regula el desplazamiento. [Código](src/shaders.rs) · [Video de las corrientes](docs/bespin-vientos.mp4)
 
-![Bespin con bandas de gas que se curvan alrededor del vórtice](docs/bespin.png)
+![Bespin con bandas cobrizas inclinadas que se curvan cerca de la tormenta](docs/bespin.png)
 
 ### Naboo
 
-Combinamos ruido a varias escalas para separar mares y lagos de las llanuras, añadir grano a la tierra y aclarar las crestas en regiones altas. Una máscara de latitud añade hielo en los polos. El umbral de `land` cambia la proporción de agua y tierra. Los límites de `ice` controlan la extensión de los casquetes.
+En `naboo` combinamos ruido a varias escalas para separar lagos azul verdoso, llanuras y franjas de agua que atraviesan el terreno. Sobre esa superficie mezclamos una máscara de nubes altas que gira en sentido contrario al de Scarif. El umbral de `land` cambia la proporción de agua y tierra. `NABOO_CLOUD_SPEED` controla el movimiento de las nubes. [Código](src/shaders.rs) · [Video de los frentes nubosos](docs/naboo-nubes.mp4)
 
-![Naboo con llanuras verdes, crestas claras y lagos azules](docs/naboo.png)
+![Naboo con mares verde azulados y frentes nubosos claros](docs/naboo.png)
 
-## Efectos solicitados para la evaluación
+### Mustafar
 
-Contamos 60 puntos básicos y los siguientes 60 puntos de efectos, para un objetivo de 120 puntos de rúbrica. El mismo efecto se reclama una sola vez.
+En `mustafar` generamos una corteza de basalto rojizo con ruido a varias escalas. Un contorno del campo de altura delimita las grietas y una segunda máscara concentra la lava en las zonas volcánicas. El brillo de la lava se desplaza dentro de las grietas incluso en el lado nocturno, mientras una capa tenue de ceniza pasa sobre la corteza. `LAVA_FLOW_SPEED` controla el ritmo del flujo. [Código](src/shaders.rs) · [Video de la lava y la ceniza](docs/mustafar-lava.mp4)
 
-| Efecto | Puntos | Cuerpo y función en [shaders.rs](src/shaders.rs) | Cómo funciona y qué podemos cambiar | Evidencia |
-| --- | ---: | --- | --- | --- |
-| Material animado | 5 | Soles de Tatooine, `tatoo_i` y `tatoo_ii` | El tiempo cambia las coordenadas del ruido para que el plasma se desplace con ambas esferas fijas. `PLASMA_SPEED` regula la velocidad. | [Video de los soles](docs/soles.mp4) |
-| Apariencia de día y noche | 5 | Scarif, `coastal_lights` | La máscara de luz habilita los asentamientos solo en las costas nocturnas. `NIGHT_LIGHT_STRENGTH` cambia su brillo. | [Barrido de luz](docs/scarif-luz.mp4). Fijarse en los puntos ámbar cerca del borde entre día y noche. |
-| Respuestas diferentes a la iluminación | 10 | Scarif, `water_reflection` y `scarif` | La máscara de agua permite un brillo especular que se mueve con la luz. La tierra usa luz difusa. Subir `WATER_SPECULAR_POWER` hace más estrecho el reflejo. | [Barrido de luz](docs/scarif-luz.mp4). El brillo blanco se desplaza sobre el agua. |
-| Nubes procedurales | 10 | Scarif, `cloud_mask` y `scarif` | El ruido de la máscara se evalúa en coordenadas que giran con el tiempo, mientras las islas se quedan fijas. `↑` y `↓` ajustan la cobertura. `CLOUD_SPEED` controla la velocidad. | [Video de nubes](docs/scarif-nubes.mp4). La dirección de la luz permanece fija. |
-| Vórtice localizado | 10 | Bespin, `bespin_vortex` y `bespin` | Deformamos las coordenadas de las bandas con un giro que se debilita hacia el borde de la tormenta. `VORTEX_RADIUS` cambia el alcance del giro. | [Captura de Bespin](docs/bespin.png) |
-| Sombras de nubes | 20 | Scarif, `cloud_shadow` y `scarif` | Desde la superficie seguimos la dirección de la luz hasta una altura virtual y evaluamos allí la misma máscara de nubes. Reducimos la luz directa según esa máscara. `CLOUD_HEIGHT` cambia cuánto se separa la sombra de la nube cuando la luz llega de lado. | [Comparación en video](docs/scarif-sombras.mp4). Izquierda con sombras, derecha con sombras desactivadas. Las nubes quedan fijas durante el barrido. |
-
-Para repetir la comparación en la ventana, seleccionamos Scarif con `2`, pausamos con Espacio y alternamos `S` mientras cambiamos la dirección de la luz con las flechas. Así podemos ver cómo cambia la posición de las sombras con respecto a las nubes. Para verificar el resto de la animación, reanudamos el tiempo y dejamos quieta la luz.
-
-Las capturas y los videos salen del mismo rasterizador que se usa en la ventana. Por ejemplo, podemos regenerar el video de los soles con FFmpeg instalado.
-
-```sh
-cargo run --release --locked -- --frames soles 144 | ffmpeg -f image2pipe -framerate 24 -c:v ppm -i pipe:0 -an -c:v libx264 -pix_fmt yuv420p soles.mp4
-```
+![Mustafar con corteza volcánica, grietas de lava y ceniza](docs/mustafar.png)

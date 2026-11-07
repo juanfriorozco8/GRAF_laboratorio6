@@ -108,7 +108,7 @@ impl Framebuffer {
     pub fn clear(&mut self) {
         self.depth.fill(0.0);
         for pixel in self.color.chunks_exact_mut(4) {
-            pixel.copy_from_slice(&[8, 10, 18, 255]);
+            pixel.copy_from_slice(&[0, 0, 0, 255]);
         }
     }
 

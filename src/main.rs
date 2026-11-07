@@ -1,3 +1,4 @@
+mod hud;
 mod pipeline;
 mod shaders;
 
@@ -7,40 +8,100 @@ use std::process::ExitCode;
 
 use raylib::prelude::*;
 
+use crate::hud::{Hud, HudState};
 use crate::pipeline::{Framebuffer, Mesh, Vec3};
 use crate::shaders::{Material, Uniforms};
 
 const WIDTH: usize = 880;
 const HEIGHT: usize = 520;
-const INITIAL_LIGHT: f32 = -0.52;
-const INITIAL_COVERAGE: f32 = 0.36;
+const VIEW_TOP: i32 = 112;
+const FOOTER_HEIGHT: i32 = 68;
 const RECORDING_FPS: f32 = 24.0;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Scene {
     Soles,
     Scarif,
     Bespin,
     Naboo,
+    Mustafar,
 }
 
 impl Scene {
+    const ALL: [Self; 5] = [
+        Self::Soles,
+        Self::Scarif,
+        Self::Bespin,
+        Self::Naboo,
+        Self::Mustafar,
+    ];
+
+    fn index(self) -> usize {
+        self as usize
+    }
+
     fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "soles" => Some(Self::Soles),
-            "scarif" => Some(Self::Scarif),
-            "bespin" => Some(Self::Bespin),
-            "naboo" => Some(Self::Naboo),
-            _ => None,
-        }
+        Self::ALL
+            .into_iter()
+            .find(|scene| scene.short_name().eq_ignore_ascii_case(name))
+            .or_else(|| (name == "soles").then_some(Self::Soles))
     }
 
     fn title(self) -> &'static str {
         match self {
-            Self::Soles => "1   /   LOS SOLES DE TATOOINE",
-            Self::Scarif => "2   /   SCARIF",
-            Self::Bespin => "3   /   BESPIN",
-            Self::Naboo => "4   /   NABOO",
+            Self::Soles => "SOLES DE TATOOINE",
+            Self::Scarif => "SCARIF",
+            Self::Bespin => "BESPIN",
+            Self::Naboo => "NABOO",
+            Self::Mustafar => "MUSTAFAR",
+        }
+    }
+
+    fn short_name(self) -> &'static str {
+        match self {
+            Self::Soles => "Tatooine",
+            Self::Scarif => "Scarif",
+            Self::Bespin => "Bespin",
+            Self::Naboo => "Naboo",
+            Self::Mustafar => "Mustafar",
+        }
+    }
+
+    fn kind(self) -> &'static str {
+        match self {
+            Self::Soles => "DOS ESTRELLAS",
+            Self::Bespin => "GIGANTE GASEOSO",
+            Self::Scarif | Self::Naboo | Self::Mustafar => "PLANETA ROCOSO",
+        }
+    }
+
+    fn effect_name(self) -> &'static str {
+        match self {
+            Self::Soles => "Actividad del plasma",
+            Self::Scarif => "Cobertura de nubes",
+            Self::Bespin => "Intensidad del viento",
+            Self::Naboo => "Cobertura de nubes altas",
+            Self::Mustafar => "Actividad de la lava",
+        }
+    }
+
+    fn default_effect(self) -> f32 {
+        match self {
+            Self::Soles => 0.5,
+            Self::Scarif => 0.38,
+            Self::Bespin => 0.46,
+            Self::Naboo => 0.56,
+            Self::Mustafar => 0.60,
+        }
+    }
+
+    fn lighting(self) -> (f32, f32) {
+        match self {
+            Self::Soles => (0.0, 0.27),
+            Self::Scarif => (0.73, 0.31),
+            Self::Bespin => (-0.85, 0.52),
+            Self::Naboo => (-1.02, 0.33),
+            Self::Mustafar => (-0.76, 0.60),
         }
     }
 }
@@ -51,14 +112,16 @@ fn render(
     scene: Scene,
     time: f32,
     light_angle: f32,
-    cloud_coverage: f32,
+    effect: f32,
     cloud_shadows: bool,
 ) {
     framebuffer.clear();
+    let (yaw, elevation) = scene.lighting();
+    let angle = yaw + light_angle;
     let uniforms = Uniforms::new(
         time,
-        Vec3::new(light_angle.sin(), 0.27, light_angle.cos()).normalized(),
-        cloud_coverage,
+        Vec3::new(angle.sin(), elevation, angle.cos()).normalized(),
+        effect,
         cloud_shadows,
     );
     match scene {
@@ -78,42 +141,48 @@ fn render(
                 &uniforms,
             );
         }
-        Scene::Scarif => {
-            framebuffer.draw_object(mesh, Vec3::zero(), 1.03, Material::Scarif, &uniforms);
-        }
-        Scene::Bespin => {
-            framebuffer.draw_object(mesh, Vec3::zero(), 1.03, Material::Bespin, &uniforms);
-        }
-        Scene::Naboo => {
-            framebuffer.draw_object(mesh, Vec3::zero(), 1.03, Material::Naboo, &uniforms);
+        Scene::Scarif | Scene::Bespin | Scene::Naboo | Scene::Mustafar => {
+            let material = match scene {
+                Scene::Scarif => Material::Scarif,
+                Scene::Bespin => Material::Bespin,
+                Scene::Naboo => Material::Naboo,
+                Scene::Mustafar => Material::Mustafar,
+                Scene::Soles => unreachable!(),
+            };
+            framebuffer.draw_object(mesh, Vec3::zero(), 1.15, material, &uniforms);
         }
     }
 }
 
 fn run_window(mesh: &Mesh, framebuffer: &mut Framebuffer) -> Result<(), Box<dyn Error>> {
+    let footer = VIEW_TOP + HEIGHT as i32;
     let (mut rl, thread) = raylib::init()
-        .size(WIDTH as i32, HEIGHT as i32)
-        .title("Laboratorio 6 | Planetas y estrellas")
+        .size(WIDTH as i32, footer + FOOTER_HEIGHT)
+        .title("Archivo estelar | Laboratorio 6")
         .build();
     rl.set_target_fps(60);
 
     let image = Image::gen_image_color(WIDTH as i32, HEIGHT as i32, Color::BLACK);
     let mut texture = rl.load_texture_from_image(&thread, &image)?;
+    let hud = Hud::load(&mut rl, &thread)?;
+    let keys = [
+        KeyboardKey::KEY_ONE,
+        KeyboardKey::KEY_TWO,
+        KeyboardKey::KEY_THREE,
+        KeyboardKey::KEY_FOUR,
+        KeyboardKey::KEY_FIVE,
+    ];
     let mut scene = Scene::Soles;
     let mut time = 0.0;
     let mut paused = false;
-    let mut light_angle = INITIAL_LIGHT;
-    let mut cloud_coverage = INITIAL_COVERAGE;
+    let mut light_angle = 0.0;
+    let mut effects = Scene::ALL.map(Scene::default_effect);
     let mut cloud_shadows = true;
+    let mut show_help = false;
 
     while !rl.window_should_close() {
         let delta = rl.get_frame_time().min(0.1);
-        for (key, view) in [
-            (KeyboardKey::KEY_ONE, Scene::Soles),
-            (KeyboardKey::KEY_TWO, Scene::Scarif),
-            (KeyboardKey::KEY_THREE, Scene::Bespin),
-            (KeyboardKey::KEY_FOUR, Scene::Naboo),
-        ] {
+        for (key, view) in keys.into_iter().zip(Scene::ALL) {
             if rl.is_key_pressed(key) {
                 scene = view;
             }
@@ -124,25 +193,23 @@ fn run_window(mesh: &Mesh, framebuffer: &mut Framebuffer) -> Result<(), Box<dyn 
         if !paused {
             time += delta;
         }
-        if rl.is_key_down(KeyboardKey::KEY_LEFT) {
-            light_angle -= delta * 0.95;
+        if rl.is_key_pressed(KeyboardKey::KEY_H) {
+            show_help = !show_help;
         }
-        if rl.is_key_down(KeyboardKey::KEY_RIGHT) {
-            light_angle += delta * 0.95;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_UP) {
-            cloud_coverage = (cloud_coverage + delta * 0.4).min(0.72);
-        }
-        if rl.is_key_down(KeyboardKey::KEY_DOWN) {
-            cloud_coverage = (cloud_coverage - delta * 0.4).max(0.08);
-        }
-        if rl.is_key_pressed(KeyboardKey::KEY_S) {
+        let direction = f32::from(rl.is_key_down(KeyboardKey::KEY_RIGHT))
+            - f32::from(rl.is_key_down(KeyboardKey::KEY_LEFT));
+        light_angle = (light_angle + direction * delta * 0.95).rem_euclid(std::f32::consts::TAU);
+        let strength = f32::from(rl.is_key_down(KeyboardKey::KEY_UP))
+            - f32::from(rl.is_key_down(KeyboardKey::KEY_DOWN));
+        let effect = &mut effects[scene.index()];
+        *effect = (*effect + strength * delta * 0.48).clamp(0.0, 1.0);
+        if rl.is_key_pressed(KeyboardKey::KEY_S) && scene == Scene::Scarif {
             cloud_shadows = !cloud_shadows;
         }
         if rl.is_key_pressed(KeyboardKey::KEY_R) {
             time = 0.0;
-            light_angle = INITIAL_LIGHT;
-            cloud_coverage = INITIAL_COVERAGE;
+            light_angle = 0.0;
+            *effect = scene.default_effect();
             cloud_shadows = true;
         }
 
@@ -152,28 +219,25 @@ fn run_window(mesh: &Mesh, framebuffer: &mut Framebuffer) -> Result<(), Box<dyn 
             scene,
             time,
             light_angle,
-            cloud_coverage,
+            *effect,
             cloud_shadows,
         );
         texture.update_texture(framebuffer.rgba())?;
 
         let mut drawing = rl.begin_drawing(&thread);
-        drawing.draw_texture(&texture, 0, 0, Color::WHITE);
-        drawing.draw_text(scene.title(), 24, 22, 19, Color::RAYWHITE);
-        let time_status = if paused { "   |   Pausa" } else { "" };
-        let shadow_status = if matches!(scene, Scene::Scarif) && !cloud_shadows {
-            "   |   Sin sombras"
-        } else {
-            ""
-        };
-        drawing.draw_text(
-            &format!(
-                "1-4: vistas   |   Flechas: luz / nubes   |   Espacio: pausa   S: sombras   R: reiniciar{time_status}{shadow_status}"
-            ),
-            24,
-            HEIGHT as i32 - 28,
-            14,
-            Color::LIGHTGRAY,
+        drawing.clear_background(Color::BLACK);
+        drawing.draw_texture(&texture, 0, VIEW_TOP, Color::WHITE);
+        hud.draw(
+            &mut drawing,
+            WIDTH as i32,
+            footer,
+            HudState {
+                scene,
+                effect: *effect,
+                paused,
+                shadows: cloud_shadows,
+                show_help,
+            },
         );
     }
     Ok(())
@@ -192,9 +256,9 @@ fn write_frames(
         let elapsed = frame as f32 / RECORDING_FPS;
         let (time, light_angle) = if sweep_light {
             let phase = frame as f32 / (count - 1).max(1) as f32;
-            (0.0, -1.20 + 2.40 * phase)
+            (0.0, -1.20 + 2.40 * phase - scene.lighting().0)
         } else {
-            (elapsed, INITIAL_LIGHT)
+            (elapsed, 0.0)
         };
         render(
             framebuffer,
@@ -202,7 +266,7 @@ fn write_frames(
             scene,
             time,
             light_angle,
-            INITIAL_COVERAGE,
+            scene.default_effect(),
             cloud_shadows,
         );
         framebuffer.write_ppm(&mut output)?;
@@ -234,7 +298,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             write_frames(&mesh, &mut framebuffer, scene, count, sweep_light, cloud_shadows)?;
             Ok(())
         }
-        _ => Err("Uso: graf-laboratorio6 [--frames <soles|scarif|bespin|naboo> <cantidad> [--sweep-light] [--without-cloud-shadows]]".into()),
+        _ => Err("Uso: graf-laboratorio6 [--frames <soles|scarif|bespin|naboo|mustafar> <cantidad> [--sweep-light] [--without-cloud-shadows]]".into()),
     }
 }
 
