@@ -1,0 +1,8 @@
+[package]
+name = "graf-laboratorio6"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+raylib = "=5.5.1"
